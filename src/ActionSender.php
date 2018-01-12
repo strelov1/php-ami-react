@@ -72,6 +72,28 @@ class ActionSender
         return $this->request('Sendtext', array('Channel' => $channel, 'Message' => $message));
     }
 
+	public function originate($from, $to, $context, $timeout = 60)
+	{
+		return $this->request('Originate', [
+			'Channel' => "SIP/{$from}",
+			'Context' => $context,
+			'Exten' => $to,
+			'Callerid' => $from,
+			'Timeout' => $timeout,
+			'Priority' => '1',
+		]);
+	}
+
+	public function redirect($channel, $to, $context)
+	{
+		return $this->request('Redirect', [
+			'Channel' => $channel,
+			'Context' => $context,
+			'Exten' => $to,
+			'Priority' => '1',
+		]);
+	}
+
     public function hangup($channel, $cause)
     {
         return $this->request('Hangup', array('Channel' => $channel, 'Cause' => $cause));
@@ -94,6 +116,21 @@ class ActionSender
     {
         return $this->collectEvents('CoreShowChannels', 'CoreShowChannelsComplete');
     }
+
+	public function activeChannel($from)
+	{
+		return $this->coreShowChannels()->then(function (Collection $collection) use ($from) {
+			/** @var \Clue\React\Ami\Protocol\Event[] $channels */
+			$channels = $collection->getEntryEvents();
+
+			foreach ($channels as $channel) {
+				$field = $channel->getFields();
+				if ((int)$field['CallerIDnum'] === $from) {
+					return $field['Channel'];
+				}
+			}
+		});
+	}
 
     /**
      *
@@ -124,7 +161,7 @@ class ActionSender
         return null;
     }
 
-    private function request($name, array $args = array())
+    public function request($name, array $args = array())
     {
         return $this->client->request($this->client->createAction($name, $args));
     }
